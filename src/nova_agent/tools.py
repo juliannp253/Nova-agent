@@ -14,11 +14,11 @@ class SearchTools:
         que NO existe en el sistema local. NUNCA usar para obtener datos del sistema 
         del usuario (versiones instaladas, procesos, archivos, red). Para eso existe run_command.
         """
-        search = SerpAPIWrapper(serpapi_api_key=Config.SERPAPI_API_KEY)
+        search = SerpAPIWrapper()
         try:
             return search.run(query)
         except Exception as e:
-            return f"Error en la búsqueda web: {str(e)}"
+            return f"Error en la búsqueda web: Verifique su SERPAPI_API_KEY. Detalle:"
 
 class FileTools:
     """Colección de herramientas para que Nova manipule archivos."""

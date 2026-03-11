@@ -1,4 +1,5 @@
 import asyncio
+import os
 import psutil
 from datetime import datetime
 from textual.app import App, ComposeResult
@@ -7,13 +8,47 @@ from textual import work
 from textual.screen import ModalScreen
 from textual.containers import Grid, Horizontal, Vertical
 from rich.panel import Panel
-from rich.text import Text
-from rich.rule import Rule
+
 
 from nova_agent.brain import Brain
 from nova_agent.executor import ToolExecutor
 from nova_agent.memory import MemoryManager
+from nova_agent.settings import SettingsManager
 
+# ── Modal: Setup inicial ───────────────────────────────────────────────────
+
+class SetupModal(ModalScreen[str]):
+    """Pantalla de primera ejecución para configurar la API Key."""
+
+    def compose(self) -> ComposeResult:
+        # Cargamos valores actuales si existen
+        keys = SettingsManager.get_keys()
+        
+        with Grid(id="setup_grid"):
+            yield Label("[ NOVA — GESTIÓN DE LLAVES API ]", id="setup_title")
+            
+            yield Label("Google AI Studio Key:", classes="metric-key")
+            yield Input(value=keys["GOOGLE_API_KEY"], placeholder="Gemini API Key (or other model API key)", id="google_input", password=True)
+            
+            yield Label("SerpApi Key (Buscador):", classes="metric-key")
+            yield Input(value=keys["SERPAPI_API_KEY"], placeholder="SERPAPI KEY (optional)", id="serp_input", password=True)
+
+            yield Label("Modelo Gemini:", classes="setup-label")
+            yield Input(value=keys["MODEL_NAME"], placeholder="gemini-1.5-flash", id="model_input")
+            
+            yield Button(label="ACTIVAR SISTEMA", variant="success", id="save_btn")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        google = self.query_one("#google_input").value.strip()
+        serp = self.query_one("#serp_input").value.strip()
+        model = self.query_one("#model_input").value.strip() or "gemini-3.1-flash-lite-preview"
+        
+        if google.startswith("AIza"):
+            self.dismiss({"google": google, "serp": serp, "model": model})
+        else:
+            self.notify("La llave de Google es obligatoria", severity="error")
+
+# ── Modal: Autorización de seguridad ───────────────────────────────────────────────────
 
 class SecurityModal(ModalScreen[bool]):
     """Modal de confirmación para acciones sensibles."""
@@ -27,19 +62,21 @@ class SecurityModal(ModalScreen[bool]):
         with Grid(id="modal_grid"):
             yield Label("[ AUTORIZACIÓN REQUERIDA ]", id="modal_title")
             yield Static(
-                f"[dim]OPERACIÓN  :[/dim] [bold white]{self.tool_name}[/bold white]\n"
-                f"[dim]ARGUMENTOS :[/dim] [white]{self.args}[/white]",
+                f"[cyan]COMANDO:[/cyan] [bold white]{self.tool_name}[/bold white]\n\n"
+                f"[cyan]ARGS:[/cyan]    [white]{self.args}[/white]",
                 id="modal_body",
             )
-            yield Button("[ PERMITIR ]", variant="success", id="allow")
-            yield Button("[ DENEGAR ]", variant="error", id="deny")
+            yield Button("PERMITIR", variant="success", id="allow")
+            yield Button("DENEGAR", variant="error", id="deny")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "allow")
 
 
+# ── App principal ──────────────────────────────────────────────────────────
+
 class NovaTUI(App):
-    """Nova Agent — Terminal UI minimalista industrial."""
+    """Nova Agent — Terminal UI."""
 
     TITLE = "NOVA"
 
@@ -152,15 +189,15 @@ class NovaTUI(App):
         padding-left: 1;
     }
 
-    /* ── Modal ────────────────────────────────────────────── */
+    /* ── Modal: Autorización ─────────────────────────── */
     #modal_grid {
         grid-size: 2;
         grid-gutter: 1;
-        grid-rows: auto 1fr auto;
+        grid-rows: 2 7 3; 
         padding: 1 2;
         background: #0d0d0d;
         border: solid #00d4aa;
-        width: 58;
+        width: 60;
         height: 18;
         align: center middle;
     }
@@ -170,7 +207,8 @@ class NovaTUI(App):
         text-align: center;
         color: #ff4444;
         text-style: bold;
-        margin-bottom: 1;
+        height: 1;
+        margin-top: 1;
     }
 
     #modal_body {
@@ -179,7 +217,8 @@ class NovaTUI(App):
         border-top: solid #1e1e1e;
         border-bottom: solid #1e1e1e;
         padding: 1;
-        margin: 1 0;
+        /* Permitimos scroll si los argumentos son muy largos */
+        overflow: auto;
     }
 
     #allow {
@@ -188,10 +227,7 @@ class NovaTUI(App):
         color: #00d4aa;
         border: solid #00d4aa;
         text-style: bold;
-    }
-
-    #allow:hover {
-        background: #004433;
+        height: 3;
     }
 
     #deny {
@@ -200,13 +236,80 @@ class NovaTUI(App):
         color: #ff4444;
         border: solid #ff4444;
         text-style: bold;
+        height: 3;
     }
 
     #deny:hover {
         background: #330000;
     }
+
+    /* ── Modal: Setup ─────────────────────────── */
+    #setup_grid {
+        grid-size: 1;
+        /* Definimos filas exactas para Título, 3 pares de Label+Input y Botón */
+        grid-rows: 2 1 3 1 3 1 3 3; 
+        grid-gutter: 0;
+        padding: 1 3;
+        background: #0d0d0d;
+        border: solid #00d4aa;
+        width: 65;
+        height: auto;
+        align: center middle;
+    }
+
+    .setup-label {
+        color: #00d4aa;
+        text-style: bold;
+        margin-top: 1;
+        width: 100%;
+    }
+
+    #setup_title {
+        color: #00d4aa;
+        text-align: center;
+        text-style: bold italic;
+        background: #1a1a1a;
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    #google_input, #serp_input, #model_input {
+        background: #111111;
+        color: #ffffff;
+        border: solid #2a2a2a;
+        height: 3;
+    }
+
+    #save_btn {
+        width: 100%;
+        background: #00d4aa;
+        color: #000000; /* Texto negro sobre fondo cyan para máximo contraste */
+        text-style: bold;
+        margin-top: 1;
+        border: none;
+    }
+
+    #save_btn:hover {
+        background: #00ffcc;
+    }
     """
 
+    BINDINGS = [("ctrl+k", "manage_keys", "Keys")] 
+
+    @work
+    async def action_manage_keys(self) -> None:
+        """Acción disparada por Ctrl+K."""
+        result = await self.push_screen_wait(SetupModal())
+        
+        if result:
+            SettingsManager.save_keys(result["google"], result["serp"], result["model"])
+            os.environ["GOOGLE_API_KEY"] = result["google"]
+            os.environ["SERPAPI_API_KEY"] = result["serp"]
+            os.environ["MODEL_NAME"] = result["model"]
+            
+            self.notify("Configuración actualizada. Reiniciando motor...")
+            self.nova = Brain()
+    
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="main_layout"):
@@ -236,16 +339,30 @@ class NovaTUI(App):
 
     # ── Montaje ────────────────────────────────────────────────────────────
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
+        self._loop = asyncio.get_event_loop()
         self._nova_start_time = datetime.now()
-        self._current_iter = 0
         self._max_iter = 15
+        self.chat_log = self.query_one("#chat_log", RichLog)
+        self.set_interval(2.0, self._tick_stats)
+        # Delegar toda la inicialización que requiere modales a un worker
+        self._initialize()
+
+    @work(exclusive=True)
+    async def _initialize(self) -> None:
+        """Inicialización completa en worker."""
+        keys = SettingsManager.get_keys()
+
+        if not keys["GOOGLE_API_KEY"]:
+            keys_data = await self.push_screen_wait(SetupModal())
+            SettingsManager.save_keys(keys_data["google"], keys_data["serp"])
+            keys = SettingsManager.get_keys()
+
+        os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
+        os.environ["SERPAPI_API_KEY"] = keys["SERPAPI_API_KEY"]
 
         self.nova = Brain()
         self.memory = MemoryManager()
-        self.chat_log = self.query_one("#chat_log", RichLog)
-
-        self.set_interval(2.0, self._tick_stats)
 
         history = self.memory.load()
         if history:
@@ -270,7 +387,7 @@ class NovaTUI(App):
             "[/bold #00d4aa]"
         )
         self.chat_log.write("")
-        self.chat_log.write("[dim]  Autonomous System Agent  //  v2.0[/dim]")
+        self.chat_log.write("[dim]  Autonomous System Agent  //  v1.0[/dim]")
         self.chat_log.write("[dim]  " + "─" * 38 + "[/dim]")
         self.chat_log.write("")
 
@@ -325,6 +442,8 @@ class NovaTUI(App):
         self.process_nova_query(user_text)
 
     # ── Procesamiento ──────────────────────────────────────────────────────
+    async def _request_authorization(self, tool_name: str, args: dict) -> bool:
+        return await self.push_screen_wait(SecurityModal(tool_name, args))
 
     @work(exclusive=True)
     async def process_nova_query(self, user_input: str) -> None:
@@ -353,7 +472,7 @@ class NovaTUI(App):
                         self.chat_log.write(
                             f"[dim]//[/dim] [yellow]auth?[/yellow] [bold white]{name}[/bold white]"
                         )
-                        authorized = await self.push_screen_wait(SecurityModal(name, args))
+                        authorized = await self._request_authorization(name, args)
                         if not authorized:
                             self.nova.add_tool_message(
                                 "STATUS: 403_FORBIDDEN. El usuario denegó la ejecución.",
