@@ -250,8 +250,7 @@ class NovaTUI(App):
     /* ── Modal: Setup ─────────────────────────── */
     #setup_grid {
         grid-size: 1;
-        /* Definimos filas exactas para Título, 3 pares de Label+Input y Botón */
-        grid-rows: 2 1 3 1 3 1 3 3; 
+        grid-rows: 2 1 3 1 3 1 3 1 3 3; 
         grid-gutter: 0;
         padding: 1 3;
         background: #0d0d0d;
@@ -277,7 +276,7 @@ class NovaTUI(App):
         margin-bottom: 1;
     }
 
-    #google_input, #serp_input, #model_input {
+    #google_input, #serp_input, #model_input, #name_input {
         background: #111111;
         color: #ffffff;
         border: solid #2a2a2a;
@@ -306,10 +305,11 @@ class NovaTUI(App):
         result = await self.push_screen_wait(SetupModal())
         
         if result:
-            SettingsManager.save_keys(result["google"], result["serp"], result["model"])
+            SettingsManager.save_keys(result["google"], result["serp"], result["model"], result["name"])
             os.environ["GOOGLE_API_KEY"] = result["google"]
             os.environ["SERPAPI_API_KEY"] = result["serp"]
             os.environ["MODEL_NAME"] = result["model"]
+            os.environ["USER_NAME"] = result["name"]
             
             self.notify("Configuración actualizada. Reiniciando motor...")
             self.nova = Brain()
@@ -359,9 +359,10 @@ class NovaTUI(App):
 
         if not keys["GOOGLE_API_KEY"]:
             keys_data = await self.push_screen_wait(SetupModal())
-            SettingsManager.save_keys(keys_data["google"], keys_data["serp"], keys_data["model"])
+            SettingsManager.save_keys(keys_data["google"], keys_data["serp"], keys_data["model"], keys_data["name"])
             keys = SettingsManager.get_keys()
 
+        os.environ["USER_NAME"] = keys["USER_NAME"]
         os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
         os.environ["SERPAPI_API_KEY"] = keys["SERPAPI_API_KEY"]
 
