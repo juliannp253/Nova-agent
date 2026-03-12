@@ -1,6 +1,6 @@
 [project]
 name = "nova-sysetm-agent-jp"
-version = "0.1.3"
+version = "0.1.4"
 description = "Local Autonomus Agent"
 authors = [
     {name = "Julian Padron",email = "julian.padronnunez03@gmail.com"}

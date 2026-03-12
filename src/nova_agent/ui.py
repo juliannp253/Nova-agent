@@ -38,9 +38,7 @@ class SetupModal(ModalScreen[str]):
 
             yield Label("Tu Nombre / Nickname:", classes="setup-label")
             yield Input(value=keys["USER_NAME"], placeholder="¿Cómo quieres que te llame?", id="name_input")
-            
-            yield Button(label="GUARDAR CAMBIOS", variant="success", id="save_btn")
-            
+                       
             yield Button(label="ACTIVAR SISTEMA", variant="success", id="save_btn")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
