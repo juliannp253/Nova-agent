@@ -355,7 +355,7 @@ class NovaTUI(App):
 
         if not keys["GOOGLE_API_KEY"]:
             keys_data = await self.push_screen_wait(SetupModal())
-            SettingsManager.save_keys(keys_data["google"], keys_data["serp"])
+            SettingsManager.save_keys(keys_data["google"], keys_data["serp"], keys_data["model"])
             keys = SettingsManager.get_keys()
 
         os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
