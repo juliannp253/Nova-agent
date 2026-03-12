@@ -35,6 +35,11 @@ class SetupModal(ModalScreen[str]):
 
             yield Label("Modelo Gemini:", classes="setup-label")
             yield Input(value=keys["MODEL_NAME"], placeholder="gemini-1.5-flash", id="model_input")
+
+            yield Label("Tu Nombre / Nickname:", classes="setup-label")
+            yield Input(value=keys["USER_NAME"], placeholder="¿Cómo quieres que te llame?", id="name_input")
+            
+            yield Button(label="GUARDAR CAMBIOS", variant="success", id="save_btn")
             
             yield Button(label="ACTIVAR SISTEMA", variant="success", id="save_btn")
 
@@ -42,9 +47,10 @@ class SetupModal(ModalScreen[str]):
         google = self.query_one("#google_input").value.strip()
         serp = self.query_one("#serp_input").value.strip()
         model = self.query_one("#model_input").value.strip() or "gemini-3.1-flash-lite-preview"
+        name = self.query_one("#name_input").value.strip() or "Usuario"
         
         if google.startswith("AIza"):
-            self.dismiss({"google": google, "serp": serp, "model": model})
+            self.dismiss({"google": google, "serp": serp, "model": model, "name": name})
         else:
             self.notify("La llave de Google es obligatoria", severity="error")
 
