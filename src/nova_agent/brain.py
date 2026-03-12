@@ -48,8 +48,9 @@ class Brain:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 persona = f.read()
         
+        user_name = os.getenv("USER_NAME", "Usuario")
         now = datetime.now().strftime("%A, %d de %B de %Y, %H:%M")
-        return f"{persona}\n\n## CONTEXTO DE SISTEMA\n- Fecha y hora: {now}\n- Usuario: Julian"
+        return f"{persona}\n\n## CONTEXTO DE SISTEMA\n- Fecha y hora: {now}\n- Usuario: {user_name}"
 
     def process_query(self, user_input: str):
         """Primer paso: recibe el input, inyecta el sistema si es necesario y decide acción."""
