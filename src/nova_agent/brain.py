@@ -57,10 +57,11 @@ class Brain:
         if not self.history:
             self.history.append(SystemMessage(content=self._get_system_prompt()))
             
-        self.history.append(HumanMessage(content=user_input))
-        response = self.llm_with_tools.invoke(self.history)
-        self.history.append(response)
-        return response
+        self.history.append(HumanMessage(content=user_input)) # HumanMessage = clase dentro de LangChain que indica que es un mensaje del humano
+        # Envía todo el historial al LLM para obtener respuesta (tool_call o respuesta directa)
+        response = self.llm_with_tools.invoke(self.history) # SystemMessage + HumanMessage + AI model con las tools
+        self.history.append(response) 
+        return response # Regresa llamada a una tool o respuesta directa
 
     def add_tool_message(self, content, tool_call_id):
         """Agrega el resultado técnico de una herramienta al flujo de conversación."""

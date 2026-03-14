@@ -17,23 +17,6 @@ class ToolExecutor:
     }
 
     SENSITIVE_TOOLS = ["write_file", "run_command", "delete_file"]
-
-    @classmethod
-    def execute(cls, tool_call):
-        name = tool_call["name"]
-        args = tool_call["args"]
-
-        if name in cls.SENSITIVE_TOOLS:
-            print(f"\n[bold red]SEGURIDAD:[/bold red] Nova quiere ejecutar: [cyan]{name}[/cyan]")
-            print(f"[dim]Argumentos: {args}[/dim]")
-            
-            # El "Approve Once" de Omni
-            if not Confirm.ask("¿Permitir esta ejecución?"):
-                return "OPERACION DENEGADA POR EL USUARIO."
-
-        if name in cls.TOOL_MAP:
-            return cls.TOOL_MAP[name].invoke(args)
-        return f"Error: Herramienta '{name}' no encontrada."
     
     @staticmethod
     def execute_direct(tool_call: dict):

@@ -8,7 +8,7 @@ class MemoryManager:
         self.max_messages = max_messages
 
     def save(self, messages):
-        # Solo guardamos los últimos N mensajes para evitar el crecimiento infinito
+        # Guardamos los últimos N mensajes para evitar el crecimiento infinito
         to_save = messages[-self.max_messages:]
         serializable = []
         for msg in to_save:

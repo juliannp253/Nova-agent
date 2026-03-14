@@ -1,8 +1,7 @@
 import os
 import subprocess
 from langchain_core.tools import tool
-from langchain_community.utilities import SerpAPIWrapper # Nueva importación
-from nova_agent.config import Config
+from langchain_community.utilities import SerpAPIWrapper
 
 class SearchTools:
     """Herramientas de búsqueda en internet."""
@@ -31,7 +30,7 @@ class FileTools:
             if not items:
                 return f"El directorio '{directory}' está vacío."
             
-            # Formateamos la salida para que sea explícita
+            # Formato salida explicita
             output = [f"Contenido del directorio '{directory}':"]
             for item in items:
                 path = os.path.join(directory, item)

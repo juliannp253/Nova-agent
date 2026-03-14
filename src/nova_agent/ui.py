@@ -48,6 +48,7 @@ class SetupModal(ModalScreen[str]):
         name = self.query_one("#name_input").value.strip() or "Usuario"
         
         if google.startswith("AIza"):
+            # Retorna el diccionario con las keys al padre que llamó a la función y cierra el Modal
             self.dismiss({"google": google, "serp": serp, "model": model, "name": name})
         else:
             self.notify("La llave de Google es obligatoria", severity="error")
@@ -57,6 +58,7 @@ class SetupModal(ModalScreen[str]):
 class SecurityModal(ModalScreen[bool]):
     """Modal de confirmación para acciones sensibles."""
 
+    # Constructor inicial para recibir los datos externos
     def __init__(self, tool_name: str, args: dict):
         super().__init__()
         self.tool_name = tool_name
@@ -74,12 +76,13 @@ class SecurityModal(ModalScreen[bool]):
             yield Button("DENEGAR", variant="error", id="deny")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "allow")
+        # Cierra modal y retorna el valor booleano
+        self.dismiss(event.button.id == "allow") # event.button.id obtiene el id del boton presionado y hace la comparación
 
 
 # ── App principal ──────────────────────────────────────────────────────────
 
-class NovaTUI(App):
+class NovaTUI(App): # App es la clase principal (main) de Textual
     """Nova Agent — Terminal UI."""
 
     TITLE = "NOVA"
@@ -297,12 +300,17 @@ class NovaTUI(App):
     }
     """
 
+    # Cuando el usuario presiona Ctrl+K, Textual llama 
+    # automáticamente al método cuyo nombre sea action_ + el segundo elemento de la tupla.
     BINDINGS = [("ctrl+k", "manage_keys", "Keys")] 
 
-    @work
-    async def action_manage_keys(self) -> None:
+    # Función que responde al comando 'CTRL+k'
+    @work # Hilo separado para no bloquear la UI
+    async def action_manage_keys(self) -> None: # async def = esperar sin congelar todo
         """Acción disparada por Ctrl+K."""
-        result = await self.push_screen_wait(SetupModal())
+        # Abre SetupModal y pausa la ejecución hasta que el Modal se cierre
+        # result = el diccionario de keys
+        result = await self.push_screen_wait(SetupModal()) 
         
         if result:
             SettingsManager.save_keys(result["google"], result["serp"], result["model"], result["name"])
@@ -312,8 +320,11 @@ class NovaTUI(App):
             os.environ["USER_NAME"] = result["name"]
             
             self.notify("Configuración actualizada. Reiniciando motor...")
+            # Reemplaza la instancia actual del agente con una nueva, usando las nuevas keys
             self.nova = Brain()
     
+    
+    # Renderizado de panel lateral con estadísticas
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="main_layout"):
@@ -343,13 +354,13 @@ class NovaTUI(App):
 
     # ── Montaje ────────────────────────────────────────────────────────────
 
+    # Método que Textual llama automaticamente al terminar de renderizar y cargar la UI
     async def on_mount(self) -> None:
         self._loop = asyncio.get_event_loop()
         self._nova_start_time = datetime.now()
         self._max_iter = 15
         self.chat_log = self.query_one("#chat_log", RichLog)
         self.set_interval(2.0, self._tick_stats)
-        # Delegar toda la inicialización que requiere modales a un worker
         self._initialize()
 
     @work(exclusive=True)
@@ -365,6 +376,7 @@ class NovaTUI(App):
         os.environ["USER_NAME"] = keys["USER_NAME"]
         os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
         os.environ["SERPAPI_API_KEY"] = keys["SERPAPI_API_KEY"]
+        os.environ["MODEL_NAME"] = keys["MODEL_NAME"]
 
         self.nova = Brain()
         self.memory = MemoryManager()
@@ -441,7 +453,7 @@ class NovaTUI(App):
             self.memory.save(self.nova.history)
             self.exit()
 
-        self.query_one("#user_input").value = ""
+        self.query_one("#user_input").value = "" # Después de recibir el input, se limpia el campo
         self.chat_log.write("")
         self.chat_log.write(f"[bold white]>[/bold white] [white]{user_text}[/white]")
         self.process_nova_query(user_text)
@@ -459,7 +471,7 @@ class NovaTUI(App):
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, self.nova.process_query, user_input)
 
-            max_iterations = self._max_iter
+            max_iterations = self._max_iter # copia local a decrementar (para no modificar la original)
             current_iter = 0
 
             while response.tool_calls and max_iterations > 0:
@@ -473,7 +485,7 @@ class NovaTUI(App):
 
                     self._set_status("EJECUTANDO", name)
 
-                    if name in ["write_file", "delete_file", "run_command"]:
+                    if name in ToolExecutor.SENSITIVE_TOOLS:
                         self.chat_log.write(
                             f"[dim]//[/dim] [yellow]auth?[/yellow] [bold white]{name}[/bold white]"
                         )
@@ -502,10 +514,12 @@ class NovaTUI(App):
             # Respuesta final
             final_text = self.nova.clean_content(response.content)
 
+            # Si iteraciones agotadas y aún uso de tools -> forzar a generar una respuesta
             if max_iterations == 0 and response.tool_calls:
                 self.chat_log.write(
                     "[dim]// límite de iteraciones alcanzado — generando resumen[/dim]"
                 )
+                # Importación local
                 from langchain_core.messages import HumanMessage
                 self.nova.history.append(HumanMessage(
                     content="Has alcanzado el límite de operaciones. No uses más herramientas. "
@@ -523,7 +537,7 @@ class NovaTUI(App):
                 response = await loop.run_in_executor(None, self.nova.ask_again)
                 final_text = self.nova.clean_content(response.content)
 
-            # Renderizar respuesta con borde limpio
+            # Renderizar respuesta
             self.chat_log.write("")
             self.chat_log.write(Panel(
                 f"[#cccccc]{final_text}[/#cccccc]",
@@ -545,7 +559,7 @@ class NovaTUI(App):
 
 app = NovaTUI()
 
-
+# toml: nova_agent.ui:run
 def run():
     """Punto de entrada para el comando 'nova'."""
     app.run()

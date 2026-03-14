@@ -24,8 +24,6 @@ dependencies = [
 nova = "nova_agent.ui:run"
 
 [tool.poetry]
-# ESTO ES LO QUE ARREGLA EL ERROR DE MÓDULO:
-# Le dice a Poetry que el código de 'nova_agent' vive dentro de 'src'
 packages = [{include = "nova_agent", from = "src"}]
 
 [build-system]
