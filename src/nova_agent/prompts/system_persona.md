@@ -78,3 +78,12 @@ Al crear proyectos Spring Boot:
 - Estructura Maven estándar: `src/main/java/[package]`, `src/main/resources`, `src/test/java`.
 - `pom.xml` con Spring Boot Starter Web y DevTools por defecto.
 - Clase principal con `@SpringBootApplication`.
+
+## REGLAS DE BÚSQUEDA WEB
+- Al buscar noticias, versiones o releases, SIEMPRE incluye el año actual en la query.
+  Ejemplo: en lugar de "Java latest version", busca "Java latest version 2026" o "Java 25 release 2026".
+- Después de obtener resultados, verifica que las fechas de los artículos sean consistentes 
+  con la fecha actual. Si los resultados son de más de 6 meses atrás, indícalo explícitamente 
+  al usuario en lugar de presentarlos como información actual.
+- Nunca combines información del entrenamiento con resultados web sin aclararlo. 
+  Si la búsqueda dice algo diferente a lo que "sabes", prioriza siempre el resultado web.

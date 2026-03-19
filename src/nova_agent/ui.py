@@ -7,6 +7,7 @@ from textual.widgets import Header, Footer, Input, RichLog, Button, Label, Stati
 from textual import work
 from textual.screen import ModalScreen
 from textual.containers import Grid, Horizontal, Vertical
+from textual.widgets import Select
 from rich.panel import Panel
 
 
@@ -20,39 +21,126 @@ from nova_agent.settings import SettingsManager
 class SetupModal(ModalScreen[str]):
     """Pantalla de primera ejecución para configurar la API Key."""
 
+    FALLBACK_MODELS = [
+        ("gemini-3.1-flash-lite (recomendado)", "gemini-3.1-flash-lite-preview"),
+        ("gemini-2.0-flash", "gemini-2.0-flash"),
+        ("gemini-1.5-flash", "gemini-1.5-flash"),
+        ("gemini-1.5-pro", "gemini-1.5-pro"),
+        ("gemini-2.5-flash-preview", "gemini-2.5-flash-preview-04-17"),
+    ]
+
     def compose(self) -> ComposeResult:
-        # Cargamos valores actuales si existen
         keys = SettingsManager.get_keys()
-        
+ 
         with Grid(id="setup_grid"):
             yield Label("[ NOVA — GESTIÓN DE LLAVES API ]", id="setup_title")
-            
+ 
             yield Label("Google AI Studio Key:", classes="metric-key")
-            yield Input(value=keys["GOOGLE_API_KEY"], placeholder="Gemini API Key (or other model API key)", id="google_input", password=True)
-            
+            yield Input(
+                value=keys["GOOGLE_API_KEY"],
+                placeholder="AIza...",
+                id="google_input",
+                password=True,
+            )
+ 
             yield Label("SerpApi Key (Buscador):", classes="metric-key")
-            yield Input(value=keys["SERPAPI_API_KEY"], placeholder="SERPAPI KEY (optional)", id="serp_input", password=True)
+            yield Input(
+                value=keys["SERPAPI_API_KEY"],
+                placeholder="SERPAPI KEY (optional)",
+                id="serp_input",
+                password=True,
+            )
+ 
+            yield Label("Modelo Gemini:", classes="metric-key")
+            current_model = keys.get("MODEL_NAME", "gemini-3.1-flash-lite-preview")
 
-            yield Label("Modelo Gemini:", classes="setup-label")
-            yield Input(value=keys["MODEL_NAME"], placeholder="gemini-1.5-flash", id="model_input")
+            fallback_values = [v for _, v in self.FALLBACK_MODELS]
+            safe_value = current_model if current_model in fallback_values else "gemini-2.0-flash"
+            yield Select(
+                options=self.FALLBACK_MODELS,
+                value=safe_value,
+                id="model_select",
+            )
 
-            yield Label("Tu Nombre / Nickname:", classes="setup-label")
-            yield Input(value=keys["USER_NAME"], placeholder="¿Cómo quieres que te llame?", id="name_input")
-                       
+            yield Static(
+                "[dim]Ingresa tu Google Key y presiona Tab para cargar modelos disponibles[/dim]",
+                id="model_hint",
+            )
+ 
+            yield Label("Tu Nombre / Nickname:", classes="metric-key")
+            yield Input(
+                value=keys.get("USER_NAME", ""),
+                placeholder="¿Cómo quieres que te llame?",
+                id="name_input",
+            )
+ 
             yield Button(label="ACTIVAR SISTEMA", variant="success", id="save_btn")
-
+ 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Cuando el usuario termina de escribir la Google Key, intenta cargar modelos reales."""
+        if event.input.id != "google_input":
+            return
+        key = event.value.strip()
+        if key.startswith("AIza") and len(key) > 20:
+            self._load_models(key)
+ 
+    @work(thread=True)
+    def _load_models(self, api_key: str) -> None:
+        """Carga modelos desde la API de Google en un hilo separado."""
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            raw = genai.list_models()
+            models = [
+                m.name.replace("models/", "")
+                for m in raw
+                if "generateContent" in m.supported_generation_methods
+                and "gemini" in m.name
+            ]
+            # Ordenar: primero los que no son preview/experimental
+            stable = sorted([m for m in models if "preview" not in m and "exp" not in m])
+            preview = sorted([m for m in models if "preview" in m or "exp" in m])
+            ordered = stable + preview
+ 
+            if ordered:
+                options = [(m, m) for m in ordered]
+                # Actualizar el Select en el hilo principal
+                self.app.call_from_thread(self._update_model_select, options)
+        except Exception:
+            # Si falla, los modelos fallback siguen ahí, no pasa nada
+            pass
+ 
+    def _update_model_select(self, options: list) -> None:
+        """Actualiza el widget Select con los modelos obtenidos."""
+        select = self.query_one("#model_select", Select)
+        current = select.value
+        select.set_options(options)
+        # Mantener selección actual si sigue disponible
+        if any(v == current for _, v in options):
+            select.value = current
+        self.query_one("#model_hint").update(
+            f"[#00d4aa]✓ {len(options)} modelos cargados[/#00d4aa]"
+        )
+ 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        google = self.query_one("#google_input").value.strip()
-        serp = self.query_one("#serp_input").value.strip()
-        model = self.query_one("#model_input").value.strip() or "gemini-3.1-flash-lite-preview"
+        google_key = self.query_one("#google_input").value.strip()
+        serpapi_key = self.query_one("#serp_input").value.strip()
+        model = str(self.query_one("#model_select", Select).value)
         name = self.query_one("#name_input").value.strip() or "Usuario"
-        
-        if google.startswith("AIza"):
-            # Retorna el diccionario con las keys al padre que llamó a la función y cierra el Modal
-            self.dismiss({"google": google, "serp": serp, "model": model, "name": name})
-        else:
-            self.notify("La llave de Google es obligatoria", severity="error")
 
+        if not google_key.startswith("AIza"):
+            self.notify("La llave de Google es obligatoria y debe comenzar con 'AIza'", severity="error")
+            return
+
+        SettingsManager.save_keys(google_key, serpapi_key, model, name)
+
+        os.environ["GOOGLE_API_KEY"] = google_key
+        os.environ["SERPAPI_API_KEY"] = serpapi_key
+        os.environ["MODEL_NAME"] = model
+        os.environ["USER_NAME"] = name
+
+        self.notify("Configuración guardada")
+        self.dismiss({"google": google_key, "serp": serpapi_key, "model": model, "name": name})
 # ── Modal: Autorización de seguridad ───────────────────────────────────────────────────
 
 class SecurityModal(ModalScreen[bool]):
@@ -551,8 +639,20 @@ class NovaTUI(App): # App es la clase principal (main) de Textual
             self.memory.save(self.nova.history)
 
         except Exception as e:
-            self.chat_log.write(f"[red]// error: {e}[/red]")
+            from nova_agent.brain import ModelNotAvailableError
             self._set_status("ERROR")
+
+            if isinstance(e, ModelNotAvailableError):
+                self.chat_log.write(f"[red]// modelo no disponible:[/red] {e}")
+                self.chat_log.write("[yellow]// abriendo configuración...[/yellow]")
+                await asyncio.sleep(1.5)
+                saved = await self.push_screen_wait(SetupModal())
+                if saved:
+                    self.chat_log.write("[dim]// reiniciando con nuevo modelo...[/dim]")
+                    self.nova = Brain()
+                    self._set_status("IDLE")
+            else:
+                self.chat_log.write(f"[red]// error: {e}[/red]")
 
 
 # ── Entry point ────────────────────────────────────────────────────────────
