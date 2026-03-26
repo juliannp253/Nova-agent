@@ -9,6 +9,7 @@ from textual.screen import ModalScreen
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Select
 from rich.panel import Panel
+from rich.markdown import Markdown
 
 
 from nova_agent.brain import Brain
@@ -417,7 +418,7 @@ class NovaTUI(App): # App es la clase principal (main) de Textual
         yield Header(show_clock=True)
         with Horizontal(id="main_layout"):
             with Vertical(id="chat_section"):
-                yield RichLog(highlight=True, markup=True, id="chat_log")
+                yield RichLog(highlight=True, markup=True, wrap=True, id="chat_log")
                 yield Input(placeholder="  > ", id="user_input")
             with Vertical(id="sidebar"):
                 yield Label("NOVA  SYS", id="sidebar_header")
@@ -628,7 +629,7 @@ class NovaTUI(App): # App es la clase principal (main) de Textual
             # Renderizar respuesta
             self.chat_log.write("")
             self.chat_log.write(Panel(
-                f"[#cccccc]{final_text}[/#cccccc]",
+                Markdown(final_text),
                 title="[bold #00d4aa]nova[/bold #00d4aa]",
                 border_style="#1e1e1e",
                 padding=(1, 2),
